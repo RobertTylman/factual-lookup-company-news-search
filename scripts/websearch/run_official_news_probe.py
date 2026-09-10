@@ -132,6 +132,11 @@ ENDPOINT_ENV = {
     "tavily_advanced": ("TAVILY_API_KEY",),
 }
 
+# Older run artifacts used ``tavily_ultrafast``.  Keep this policy separate
+# from ENDPOINTS so resume/attach also removes any future retired Tavily tier
+# instead of carrying it into a newly written run.
+TAVILY_ENDPOINTS = frozenset({"tavily_basic", "tavily_advanced"})
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -709,7 +714,36 @@ def _dedupe_cost_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def _remove_retired_tavily(row: dict[str, Any]) -> dict[str, Any]:
+    """Drop persisted Tavily tiers other than Basic and Advanced.
+
+    This is applied when loading runs for --resume/--attach.  Without it, an
+    older fast or ultra-fast result remains in the artifact even though fresh
+    calls only use the two supported tiers.
+    """
+    cleaned = dict(row)
+    retired = {
+        name
+        for name in (row.get("vendors") or {})
+        if name.startswith("tavily_") and name not in TAVILY_ENDPOINTS
+    }
+    if not retired:
+        return cleaned
+    cleaned["vendors"] = {
+        name: value for name, value in (row.get("vendors") or {}).items() if name not in retired
+    }
+    cleaned["gold_scores"] = {
+        name: value for name, value in (row.get("gold_scores") or {}).items() if name not in retired
+    }
+    cleaned["cost_events"] = [
+        event for event in (row.get("cost_events") or []) if event.get("vendor") not in retired
+    ]
+    return cleaned
+
+
 def _merge_row(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
+    existing = _remove_retired_tavily(existing)
+    incoming = _remove_retired_tavily(incoming)
     merged = dict(existing)
     vendors = dict(existing.get("vendors") or {})
     vendors.update(incoming.get("vendors") or {})
@@ -867,6 +901,7 @@ def main() -> None:
                 rows = [_merge_row(row, by_partial[row["id"]]) if row.get("id") in by_partial else row for row in rows]
                 seen = {r.get("id") for r in rows}
                 rows.extend(r for r in partial_rows if r.get("id") not in seen)
+        rows = [_remove_retired_tavily(row) for row in rows]
         by_id = {r.get("id"): r for r in rows}
         pending = []
         for case in cases:
@@ -880,7 +915,10 @@ def main() -> None:
         print(f"attach {out_dir} already={len(rows)} missing_cases={len(cases)} endpoints={endpoints}")
     elif args.resume:
         out_dir = args.resume
-        rows = json.loads((out_dir / "run.partial.json").read_text()).get("cases") or []
+        rows = [
+            _remove_retired_tavily(row)
+            for row in (json.loads((out_dir / "run.partial.json").read_text()).get("cases") or [])
+        ]
         done = {r.get("id") for r in rows}
         cases = [c for c in cases if c.get("id") not in done]
         print(f"resume {out_dir} already={len(done)} remaining={len(cases)}")
