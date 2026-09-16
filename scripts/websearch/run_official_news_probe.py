@@ -51,6 +51,9 @@ DEFAULT_MODEL = "gpt-5.6-terra"
 # RapidAPI google-search74 Pro overage is $0.003/request. TinyFish Search
 # is free with a 30 req/min cap.
 UNIT_COST_USD = {
+    "nimble_lite": 0.0011,
+    "nimble_lite_news": 0.0011,
+    "nimble_standard": 0.005,
     "parallel_turbo": 0.001,
     "parallel_fast": 0.001,
     "parallel_basic": 0.005,
@@ -58,7 +61,7 @@ UNIT_COST_USD = {
     "exa_fast": 0.007,
     "brave": 0.005,
     "brave_llm": 0.005,
-    "you": 0.005,
+    "you_highlights_core": 0.005,
     "you_highlights": 0.005,
     "perplexity_low": 0.005,
     "tinyfish": 0.0,
@@ -73,6 +76,9 @@ UNIT_COST_USD = {
 }
 
 ENDPOINTS = (
+    "nimble_lite",
+    "nimble_lite_news",
+    "nimble_standard",
     "tinyfish",
     "parallel_fast",
     "parallel_turbo",
@@ -81,7 +87,7 @@ ENDPOINTS = (
     "linkup_fast",
     "firecrawl",
     "brave_llm",
-    "you",
+    "you_highlights_core",
     "parallel_basic",
     "brave",
     "linkup_standard",
@@ -93,6 +99,9 @@ ENDPOINTS = (
 )
 
 ENDPOINT_MAP = {
+    "nimble_lite": "POST https://sdk.nimbleway.com/v2/search search_depth=lite full_content=false focus=general max_results=10",
+    "nimble_lite_news": "POST https://sdk.nimbleway.com/v2/search search_depth=lite full_content=false focus=news max_results=10",
+    "nimble_standard": "POST https://sdk.nimbleway.com/v2/search search_depth=standard full_content=false focus=general max_results=10",
     "tinyfish": "GET https://api.search.tinyfish.ai",
     "parallel_fast": "POST https://api.parallel.ai/v1/search mode=fast",
     "parallel_turbo": "POST https://api.parallel.ai/v1/search mode=turbo",
@@ -101,7 +110,7 @@ ENDPOINT_MAP = {
     "linkup_fast": "POST https://api.linkup.so/v1/search depth=fast outputType=searchResults maxResults=10",
     "firecrawl": "POST https://api.firecrawl.dev/v2/search",
     "brave_llm": "POST https://api.search.brave.com/res/v1/llm/context",
-    "you": "POST https://ydc-index.io/v1/search",
+    "you_highlights_core": "POST https://ydc-index.io/v1/search extraction_mode=highlights knowledge=core",
     "parallel_basic": "POST https://api.parallel.ai/v1/search mode=basic",
     "brave": "GET https://api.search.brave.com/res/v1/web/search count=10 result_filter=web",
     "linkup_standard": "POST https://api.linkup.so/v1/search depth=standard outputType=searchResults maxResults=10",
@@ -113,6 +122,9 @@ ENDPOINT_MAP = {
 }
 
 ENDPOINT_ENV = {
+    "nimble_lite": ("NIMBLE_API_KEY",),
+    "nimble_lite_news": ("NIMBLE_API_KEY",),
+    "nimble_standard": ("NIMBLE_API_KEY",),
     "tinyfish": ("TINYFISH_API_KEY",),
     "parallel_fast": ("PARALLEL_API_KEY",),
     "parallel_turbo": ("PARALLEL_API_KEY",),
@@ -121,7 +133,7 @@ ENDPOINT_ENV = {
     "linkup_fast": ("LINKUP_API_KEY",),
     "firecrawl": ("FIRECRAWL_API_KEY",),
     "brave_llm": ("BRAVE_SEARCH_API_KEY",),
-    "you": ("YDC_API_KEY",),
+    "you_highlights_core": ("YDC_API_KEY",),
     "parallel_basic": ("PARALLEL_API_KEY",),
     "brave": ("BRAVE_SEARCH_API_KEY",),
     "linkup_standard": ("LINKUP_API_KEY",),
@@ -397,8 +409,39 @@ def _parse_perplexity(payload: Any) -> list[dict[str, Any]]:
     return _dedupe(hits)
 
 
+def _parse_nimble(payload: Any) -> list[dict[str, Any]]:
+    # With full_content=false, description is the search excerpt. Do not feed
+    # the optional full-page content field into the search-only extractor.
+    rows = payload.get("results") if isinstance(payload, dict) else None
+    hits = []
+    for item in rows if isinstance(rows, list) else []:
+        if not isinstance(item, dict) or not isinstance(item.get("url"), str) or not item["url"].strip():
+            continue
+        hits.append(_hit(item["url"], item.get("title"), item.get("description")))
+    return _dedupe(hits)
+
+
 def call_endpoint(name: str, question: str, case: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     del case
+    if name in {"nimble_lite", "nimble_lite_news", "nimble_standard"}:
+        raw = _http(
+            method="POST",
+            url="https://sdk.nimbleway.com/v2/search",
+            headers={
+                "Authorization": f"Bearer {os.environ['NIMBLE_API_KEY']}",
+                "Content-Type": "application/json",
+            },
+            body={
+                "query": question,
+                "search_depth": "standard" if name == "nimble_standard" else "lite",
+                "full_content": False,
+                "focus": "news" if name == "nimble_lite_news" else "general",
+                "max_results": MAX_RESULTS,
+            },
+            params=None,
+            timeout=60,
+        )
+        return (_parse_nimble(raw.get("response")) if raw["ok"] else []), raw
     if name.startswith("parallel_"):
         mode = name.removeprefix("parallel_")
         if mode not in {"turbo", "fast", "basic"}:
@@ -482,18 +525,19 @@ def call_endpoint(name: str, question: str, case: dict[str, Any]) -> tuple[list[
         )
         hits = _parse_brave_llm(raw.get("response")) if raw["ok"] else []
         return hits, raw
-    if name in {"you", "you_highlights"}:
+    if name in {"you_highlights", "you_highlights_core"}:
         you_key = _first_env("YDC_API_KEY", "YOU_API_KEY", "YOU_KEY")
         body: dict[str, Any] = {"query": question, "count": MAX_RESULTS}
-        if name == "you_highlights":
-            body["extraction"] = {"extraction_mode": "highlights"}
+        body["extraction"] = {"extraction_mode": "highlights"}
+        if name == "you_highlights_core":
+            body["knowledge"] = "core"
         raw = _http(
             method="POST",
             url="https://ydc-index.io/v1/search",
             headers={"X-API-Key": you_key, "Content-Type": "application/json"},
             body=body,
             params=None,
-            timeout=45 if name == "you_highlights" else 30,
+            timeout=45,
         )
         hits = _parse_you(raw.get("response")) if raw["ok"] else []
         return hits, raw

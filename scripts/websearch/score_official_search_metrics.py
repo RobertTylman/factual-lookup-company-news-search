@@ -19,6 +19,7 @@ RUN = ROOT / "data" / "company-news" / "official-runs" / "20260816T020806Z"
 SAMPLES = ROOT / "data" / "company-news" / "samples.json"
 KS = (1, 5, 10)
 ENDPOINTS = (
+    "nimble_lite", "nimble_lite_news", "nimble_standard",
     "tinyfish",
     "parallel_fast",
     "parallel_turbo",
@@ -27,7 +28,7 @@ ENDPOINTS = (
     "linkup_fast",
     "firecrawl",
     "brave_llm",
-    "you",
+    "you_highlights_core",
     "parallel_basic",
     "brave",
     "linkup_standard",
