@@ -1,7 +1,7 @@
 # Web Search API Benchmark for AI Agents: Factual Lookup on Company News
 
 Open, independent benchmark of web search APIs for AI agents on factual lookup:
-TinyFish, Parallel, Perplexity, Linkup, Firecrawl, Brave Search, You, Exa,
+TinyFish, Parallel, Perplexity, Linkup, Firecrawl, Brave Search, You, Nimble, Exa,
 Tavily, and a Google SERP API. 300 company-news questions, one query each, no
 query rewrite and no page fetch, scored on extracted-answer accuracy and ranked
 by cost per 1,000 correct answers. Open source code + open data.
@@ -29,21 +29,26 @@ so $0 is not unlimited throughput. The best-value paid row is **Parallel
 | # | Vendor | Endpoint | $ / 1k correct | Accuracy | AR@1 | AR@5 | Latency | Snippet tokens |
 |---|---|---|---|---|---|---|---|---|
 | 1 | TinyFish | GET api.search.tinyfish.ai | Free (30 req/min) | 92.0% | 74.3% | 90.7% | 2.62s | 441 |
-| 2 | Parallel fast | POST /v1/search mode=fast | $1.16 | 86.0% | 44.3% | 79.0% | 942ms | 1,839 |
-| 3 | Parallel turbo | POST /v1/search mode=turbo | $1.40 | 71.3% | 45.3% | 66.0% | 348ms | 1,853 |
+| 1 | Parallel fast | POST /v1/search mode=fast | $1.16 | 86.0% | 44.3% | 79.0% | 942ms | 1,839 |
+| 2 | Parallel turbo | POST /v1/search mode=turbo | $1.40 | 71.3% | 45.3% | 66.0% | 348ms | 1,853 |
+| 3 | Nimble | POST /v2/search search_depth=lite · focus=general | $1.46 | 75.3% | 64.0% | 75.3% | 3.15s | 413 |
 | 4 | SERP (RapidAPI) | GET google-search74 limit=10 | $3.13 | 96.0% | 78.0% | 95.0% | 751ms | 497 |
 | 5 | Perplexity (low) | POST /search context=low | $5.14 | 97.3% | 91.7% | 98.3% | 1.38s | 476 |
 | 6 | Linkup fast | POST /v1/search depth=fast | $5.17 | 96.7% | 79.0% | 94.7% | 1.57s | 3,022 |
 | 7 | Firecrawl | POST /v2/search | $5.24 | 95.3% | 77.7% | 96.7% | 510ms | 678 |
-| 8 | Brave LLM Context | POST /res/v1/llm/context | $5.32 | 94.0% | 81.0% | 94.7% | 601ms | 2,064 |
-| 9 | You | POST /v1/search count=10 | $5.36 | 93.3% | 84.7% | 94.7% | 532ms | 2,708 |
+| 8 | Nimble | POST /v2/search search_depth=lite · focus=news | $5.24 | 21.0% | 10.3% | 23.0% | 2.19s | 237 |
+| 9 | Brave LLM Context | POST /res/v1/llm/context | $5.32 | 94.0% | 81.0% | 94.7% | 601ms | 2,064 |
 | 10 | Parallel basic | POST /v1/search mode=basic | $5.36 | 93.3% | 55.0% | 92.0% | 1.68s | 2,330 |
 | 11 | Brave Search | GET /res/v1/web/search | $5.36 | 93.3% | 79.3% | 91.7% | 630ms | 817 |
-| 12 | Linkup standard | POST /v1/search depth=standard | $5.43 | 92.0% | 67.3% | 90.3% | 2.55s | 2,983 |
-| 13 | You highlights | POST /v1/search highlights | $5.51 | 90.7% | 72.0% | 89.7% | 628ms | 2,837 |
-| 14 | Exa fast | POST /search type=fast | $7.05 | 99.3% | 95.0% | 99.3% | 652ms | 1,987 |
-| 15 | Exa instant | POST /search type=instant | $7.17 | 97.7% | 80.0% | 97.3% | 398ms | 2,128 |
-| 16 | Tavily ultra-fast | POST /search depth=ultra-fast | $60.02 | 13.3% | 10.0% | 17.0% | 191ms | 2,827 |
+| 12 | Nimble | POST /v2/search search_depth=standard · focus=general | $5.38 | 93.0% | 86.3% | 94.3% | 861ms | 2,730 |
+| 13 | Linkup standard | POST /v1/search depth=standard | $5.43 | 92.0% | 67.3% | 90.3% | 2.55s | 2,983 |
+| 14 | You | POST /v1/search extraction_mode=highlights · knowledge=core | $5.43 | 92.0% | 67.3% | 89.7% | 889ms | 2,862 |
+| 15 | You | POST /v1/search extraction_mode=highlights | $5.51 | 90.7% | 72.0% | 89.7% | 628ms | 2,837 |
+| 16 | Exa fast | POST /search type=fast | $7.05 | 99.3% | 95.0% | 99.3% | 652ms | 1,987 |
+| 17 | Exa instant | POST /search type=instant | $7.17 | 97.7% | 80.0% | 97.3% | 398ms | 2,128 |
+| 18 | Tavily ultra-fast | POST /search depth=ultra-fast | $60.02 | 13.3% | 10.0% | 17.0% | 191ms | 2,827 |
+
+Table updated **2026-09-15**.
 
 Cost per 1,000 queries is the published PAYG list price, not promotional packs
 or volume discounts. The
@@ -58,7 +63,7 @@ Full ranking: https://openbenchmarks.com/web-search/cheapest-search-api
 Perplexity (low) at 97.3% and Exa instant at 97.7%. Exa fast also leads answer
 recall, with the correct answer already in the first snippet 95.0% of the time.
 
-Accuracy is tightly bunched: eleven of sixteen rows land between 90% and 99%.
+Accuracy is tightly bunched: fourteen of nineteen rows land between 90% and 99%.
 On a one-query lookup the interesting spread is cost and latency, not accuracy.
 The exception is Tavily ultra-fast at 13.3%, which trades essentially all of its
 accuracy for the fastest response on the board.
@@ -83,8 +88,8 @@ matters when the snippets land in an agent's context window on every call.
 **TinyFish** leads at roughly 209 accuracy points per 1,000 snippet tokens,
 ahead of Perplexity (low) at 204 and SERP at 193.
 
-Snippet volume varies by nearly 7x across the board, from 441 tokens for
-TinyFish to 3,022 for Linkup fast, with no corresponding accuracy gain.
+Snippet volume varies by nearly 13x across the board, from 237 tokens for
+Nimble lite/news to 3,022 for Linkup fast, with no corresponding accuracy gain.
 
 Full ranking: https://openbenchmarks.com/web-search/most-token-efficient-search-api
 
@@ -141,7 +146,10 @@ These are the general web-search arms on the live factual-lookup board:
 | `linkup_fast` | POST /v1/search depth=fast |
 | `firecrawl` | POST /v2/search |
 | `brave_llm` | POST /res/v1/llm/context |
-| `you` | POST /v1/search |
+| `nimble_lite` | POST /v2/search search_depth=lite full_content=false focus=general |
+| `nimble_lite_news` | POST /v2/search search_depth=lite full_content=false focus=news |
+| `nimble_standard` | POST /v2/search search_depth=standard full_content=false focus=general |
+| `you_highlights_core` | POST /v1/search extraction_mode=highlights knowledge=core |
 | `parallel_basic` | POST /v1/search mode=basic |
 | `brave` | GET /res/v1/web/search |
 | `linkup_standard` | POST /v1/search depth=standard |
@@ -185,6 +193,10 @@ same vendors are measured on two other jobs:
   https://openbenchmarks.com/multi-turn-company-search
 - **Methodology and all three boards:** https://openbenchmarks.com/web-search
 - **Agent-readable index:** https://openbenchmarks.com/llms.txt
+
+## Changelog
+
+- **2026-09-15.** Added Nimble Search lite/general, lite/news, and standard/general to the existing table and runner roster. All use `full_content=false`, 10 results, and descriptions only; no Extract call. Added You highlights + `knowledge=core` on the 300-question Company News benchmark; published accuracy is 92.0%, versus 90.7% with highlights alone. Updated the You roster and request contracts.
 
 ## License
 
